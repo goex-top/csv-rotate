@@ -1,4 +1,4 @@
-package lumberjack
+package csv_rotate
 
 import (
 	"os"

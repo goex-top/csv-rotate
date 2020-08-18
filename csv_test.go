@@ -1,4 +1,4 @@
-package lumberjack
+package csv_rotate
 
 import (
 	"bytes"
@@ -35,7 +35,7 @@ func TestNewFile(t *testing.T) {
 
 	dir := makeTempDir("TestNewFile", t)
 	defer os.RemoveAll(dir)
-	l := &Logger{
+	l := &Csv{
 		Filename: logFile(dir),
 	}
 	defer l.Close()
@@ -58,7 +58,7 @@ func TestOpenExisting(t *testing.T) {
 	isNil(err, t)
 	existsWithContent(filename, data, t)
 
-	l := &Logger{
+	l := &Csv{
 		Filename: filename,
 	}
 	defer l.Close()
@@ -79,7 +79,7 @@ func TestWriteTooLong(t *testing.T) {
 	megabyte = 1
 	dir := makeTempDir("TestWriteTooLong", t)
 	defer os.RemoveAll(dir)
-	l := &Logger{
+	l := &Csv{
 		Filename: logFile(dir),
 		MaxSize:  5,
 	}
@@ -100,7 +100,7 @@ func TestMakeLogDir(t *testing.T) {
 	dir = filepath.Join(os.TempDir(), dir)
 	defer os.RemoveAll(dir)
 	filename := logFile(dir)
-	l := &Logger{
+	l := &Csv{
 		Filename: filename,
 	}
 	defer l.Close()
@@ -117,7 +117,7 @@ func TestDefaultFilename(t *testing.T) {
 	dir := os.TempDir()
 	filename := filepath.Join(dir, filepath.Base(os.Args[0])+"-lumberjack.log")
 	defer os.Remove(filename)
-	l := &Logger{}
+	l := &Csv{}
 	defer l.Close()
 	b := []byte("boo!")
 	n, err := l.Write(b)
@@ -135,7 +135,7 @@ func TestAutoRotate(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	filename := logFile(dir)
-	l := &Logger{
+	l := &Csv{
 		Filename: filename,
 		MaxSize:  10,
 	}
@@ -172,7 +172,7 @@ func TestFirstWriteRotate(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	filename := logFile(dir)
-	l := &Logger{
+	l := &Csv{
 		Filename: filename,
 		MaxSize:  10,
 	}
@@ -203,7 +203,7 @@ func TestMaxBackups(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	filename := logFile(dir)
-	l := &Logger{
+	l := &Csv{
 		Filename:   filename,
 		MaxSize:    10,
 		MaxBackups: 1,
@@ -355,7 +355,7 @@ func TestCleanupExistingBackups(t *testing.T) {
 	err = ioutil.WriteFile(filename, data, 0644)
 	isNil(err, t)
 
-	l := &Logger{
+	l := &Csv{
 		Filename:   filename,
 		MaxSize:    10,
 		MaxBackups: 1,
@@ -385,7 +385,7 @@ func TestMaxAge(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	filename := logFile(dir)
-	l := &Logger{
+	l := &Csv{
 		Filename: filename,
 		MaxSize:  10,
 		MaxAge:   1,
@@ -474,7 +474,7 @@ func TestOldLogFiles(t *testing.T) {
 	err = ioutil.WriteFile(backup2, data, 07)
 	isNil(err, t)
 
-	l := &Logger{Filename: filename}
+	l := &Csv{Filename: filename}
 	files, err := l.oldLogFiles()
 	isNil(err, t)
 	equals(2, len(files), t)
@@ -485,7 +485,7 @@ func TestOldLogFiles(t *testing.T) {
 }
 
 func TestTimeFromName(t *testing.T) {
-	l := &Logger{Filename: "/var/log/myfoo/foo.log"}
+	l := &Csv{Filename: "/var/log/myfoo/foo.log"}
 	prefix, ext := l.prefixAndExt()
 
 	tests := []struct {
@@ -513,7 +513,7 @@ func TestLocalTime(t *testing.T) {
 	dir := makeTempDir("TestLocalTime", t)
 	defer os.RemoveAll(dir)
 
-	l := &Logger{
+	l := &Csv{
 		Filename:  logFile(dir),
 		MaxSize:   10,
 		LocalTime: true,
@@ -540,7 +540,7 @@ func TestRotate(t *testing.T) {
 
 	filename := logFile(dir)
 
-	l := &Logger{
+	l := &Csv{
 		Filename:   filename,
 		MaxBackups: 1,
 		MaxSize:    100, // megabytes
@@ -598,7 +598,7 @@ func TestCompressOnRotate(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	filename := logFile(dir)
-	l := &Logger{
+	l := &Csv{
 		Compress: true,
 		Filename: filename,
 		MaxSize:  10,
@@ -647,7 +647,7 @@ func TestCompressOnResume(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	filename := logFile(dir)
-	l := &Logger{
+	l := &Csv{
 		Compress: true,
 		Filename: filename,
 		MaxSize:  10,
@@ -699,7 +699,7 @@ func TestJson(t *testing.T) {
 	"compress": true
 }`[1:])
 
-	l := Logger{}
+	l := Csv{}
 	err := json.Unmarshal(data, &l)
 	isNil(err, t)
 	equals("foo", l.Filename, t)
@@ -719,7 +719,7 @@ maxbackups: 3
 localtime: true
 compress: true`[1:])
 
-	l := Logger{}
+	l := Csv{}
 	err := yaml.Unmarshal(data, &l)
 	isNil(err, t)
 	equals("foo", l.Filename, t)
@@ -739,7 +739,7 @@ maxbackups = 3
 localtime = true
 compress = true`[1:]
 
-	l := Logger{}
+	l := Csv{}
 	md, err := toml.Decode(data, &l)
 	isNil(err, t)
 	equals("foo", l.Filename, t)
@@ -786,9 +786,9 @@ func backupFileLocal(dir string) string {
 	return filepath.Join(dir, "foobar-"+fakeTime().Format(backupTimeFormat)+".log")
 }
 
-// logFileLocal returns the log file name in the given directory for the current
+// csvFileLocal returns the log file name in the given directory for the current
 // fake time using the local timezone.
-func logFileLocal(dir string) string {
+func csvFileLocal(dir string) string {
 	return filepath.Join(dir, fakeTime().Format(backupTimeFormat))
 }
 
