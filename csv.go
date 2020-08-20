@@ -378,6 +378,7 @@ func (c *Csv) openExistingOrNew(writeLen int) error {
 		return c.openNew()
 	}
 	c.file = file
+	c.csv = csv.NewWriter(file)
 	c.size = info.Size()
 	return nil
 }
