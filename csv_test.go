@@ -36,14 +36,14 @@ func TestNewFile(t *testing.T) {
 	dir := makeTempDir("TestNewFile", t)
 	defer os.RemoveAll(dir)
 	l := &Csv{
-		Filename: logFile(dir),
+		Filename: csvFile(dir),
 	}
 	defer l.Close()
 	b := []byte("boo!")
 	n, err := l.Write(b)
 	isNil(err, t)
 	equals(len(b), n, t)
-	existsWithContent(logFile(dir), b, t)
+	existsWithContent(csvFile(dir), b, t)
 	fileCount(dir, 1, t)
 }
 
@@ -52,7 +52,7 @@ func TestOpenExisting(t *testing.T) {
 	dir := makeTempDir("TestOpenExisting", t)
 	defer os.RemoveAll(dir)
 
-	filename := logFile(dir)
+	filename := csvFile(dir)
 	data := []byte("foo!")
 	err := ioutil.WriteFile(filename, data, 0644)
 	isNil(err, t)
@@ -80,7 +80,7 @@ func TestWriteTooLong(t *testing.T) {
 	dir := makeTempDir("TestWriteTooLong", t)
 	defer os.RemoveAll(dir)
 	l := &Csv{
-		Filename: logFile(dir),
+		Filename: csvFile(dir),
 		MaxSize:  5,
 	}
 	defer l.Close()
@@ -90,7 +90,7 @@ func TestWriteTooLong(t *testing.T) {
 	equals(0, n, t)
 	equals(err.Error(),
 		fmt.Sprintf("write length %d exceeds maximum file size %d", len(b), l.MaxSize), t)
-	_, err = os.Stat(logFile(dir))
+	_, err = os.Stat(csvFile(dir))
 	assert(os.IsNotExist(err), t, "File exists, but should not have been created")
 }
 
@@ -99,7 +99,7 @@ func TestMakeLogDir(t *testing.T) {
 	dir := time.Now().Format("TestMakeLogDir" + backupTimeFormat)
 	dir = filepath.Join(os.TempDir(), dir)
 	defer os.RemoveAll(dir)
-	filename := logFile(dir)
+	filename := csvFile(dir)
 	l := &Csv{
 		Filename: filename,
 	}
@@ -108,14 +108,14 @@ func TestMakeLogDir(t *testing.T) {
 	n, err := l.Write(b)
 	isNil(err, t)
 	equals(len(b), n, t)
-	existsWithContent(logFile(dir), b, t)
+	existsWithContent(csvFile(dir), b, t)
 	fileCount(dir, 1, t)
 }
 
 func TestDefaultFilename(t *testing.T) {
 	currentTime = fakeTime
 	dir := os.TempDir()
-	filename := filepath.Join(dir, filepath.Base(os.Args[0])+"-lumberjack.log")
+	filename := filepath.Join(dir, filepath.Base(os.Args[0])+"-csv-rotate.csv")
 	defer os.Remove(filename)
 	l := &Csv{}
 	defer l.Close()
@@ -134,7 +134,7 @@ func TestAutoRotate(t *testing.T) {
 	dir := makeTempDir("TestAutoRotate", t)
 	defer os.RemoveAll(dir)
 
-	filename := logFile(dir)
+	filename := csvFile(dir)
 	l := &Csv{
 		Filename: filename,
 		MaxSize:  10,
@@ -165,13 +165,53 @@ func TestAutoRotate(t *testing.T) {
 	fileCount(dir, 2, t)
 }
 
+func TestAutoRotate2(t *testing.T) {
+	currentTime = fakeTime
+	megabyte = 1
+
+	dir := makeTempDir("TestAutoRotate", t)
+	//defer os.RemoveAll(dir)
+
+	filename := csvFile(dir)
+	l := &Csv{
+		Filename:  filename,
+		MaxSize:   1,
+		CsvHeader: []string{"a", "b", "c"},
+		LocalTime: true,
+	}
+	defer l.Close()
+	b := []string{"a1", "b1", "c1"}
+	err := l.Save(b)
+	isNil(err, t)
+	//equals(len(b), n, t)
+
+	//existsWithContent(filename, b, t)
+	fileCount(dir, 1, t)
+
+	newFakeTime()
+
+	b2 := []string{"a2", "b2", "c2"}
+	err = l.Save(b2)
+	isNil(err, t)
+	//equals(len(b2), n, t)
+
+	// the old logfile should be moved aside and the main logfile should have
+	// only the last write in it.
+	//existsWithContent(filename, b2, t)
+
+	// the backup file will use the current fake time and have the old contents.
+	//existsWithContent(backupFile(dir), b, t)
+
+	fileCount(dir, 2, t)
+}
+
 func TestFirstWriteRotate(t *testing.T) {
 	currentTime = fakeTime
 	megabyte = 1
 	dir := makeTempDir("TestFirstWriteRotate", t)
 	defer os.RemoveAll(dir)
 
-	filename := logFile(dir)
+	filename := csvFile(dir)
 	l := &Csv{
 		Filename: filename,
 		MaxSize:  10,
@@ -202,7 +242,7 @@ func TestMaxBackups(t *testing.T) {
 	dir := makeTempDir("TestMaxBackups", t)
 	defer os.RemoveAll(dir)
 
-	filename := logFile(dir)
+	filename := csvFile(dir)
 	l := &Csv{
 		Filename:   filename,
 		MaxSize:    10,
@@ -267,7 +307,7 @@ func TestMaxBackups(t *testing.T) {
 
 	// create a file that is close to but different from the logfile name.
 	// It shouldn't get caught by our deletion filters.
-	notlogfile := logFile(dir) + ".foo"
+	notlogfile := csvFile(dir) + ".foo"
 	err = ioutil.WriteFile(notlogfile, []byte("data"), 0644)
 	isNil(err, t)
 
@@ -351,7 +391,7 @@ func TestCleanupExistingBackups(t *testing.T) {
 	isNil(err, t)
 
 	// now create a primary log file with some data
-	filename := logFile(dir)
+	filename := csvFile(dir)
 	err = ioutil.WriteFile(filename, data, 0644)
 	isNil(err, t)
 
@@ -384,7 +424,7 @@ func TestMaxAge(t *testing.T) {
 	dir := makeTempDir("TestMaxAge", t)
 	defer os.RemoveAll(dir)
 
-	filename := logFile(dir)
+	filename := csvFile(dir)
 	l := &Csv{
 		Filename: filename,
 		MaxSize:  10,
@@ -451,7 +491,7 @@ func TestOldLogFiles(t *testing.T) {
 	dir := makeTempDir("TestOldLogFiles", t)
 	defer os.RemoveAll(dir)
 
-	filename := logFile(dir)
+	filename := csvFile(dir)
 	data := []byte("data")
 	err := ioutil.WriteFile(filename, data, 07)
 	isNil(err, t)
@@ -485,7 +525,7 @@ func TestOldLogFiles(t *testing.T) {
 }
 
 func TestTimeFromName(t *testing.T) {
-	l := &Csv{Filename: "/var/log/myfoo/foo.log"}
+	l := &Csv{Filename: "/var/log/myfoo/foo.csv"}
 	prefix, ext := l.prefixAndExt()
 
 	tests := []struct {
@@ -493,10 +533,10 @@ func TestTimeFromName(t *testing.T) {
 		want     time.Time
 		wantErr  bool
 	}{
-		{"foo-2014-05-04T14-44-33.555.log", time.Date(2014, 5, 4, 14, 44, 33, 555000000, time.UTC), false},
+		{"foo-2014-05-04T14-44-33.555.csv", time.Date(2014, 5, 4, 14, 44, 33, 555000000, time.UTC), false},
 		{"foo-2014-05-04T14-44-33.555", time.Time{}, true},
-		{"2014-05-04T14-44-33.555.log", time.Time{}, true},
-		{"foo.log", time.Time{}, true},
+		{"2014-05-04T14-44-33.555.csv", time.Time{}, true},
+		{"foo.csv", time.Time{}, true},
 	}
 
 	for _, test := range tests {
@@ -514,7 +554,7 @@ func TestLocalTime(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	l := &Csv{
-		Filename:  logFile(dir),
+		Filename:  csvFile(dir),
 		MaxSize:   10,
 		LocalTime: true,
 	}
@@ -529,7 +569,7 @@ func TestLocalTime(t *testing.T) {
 	isNil(err, t)
 	equals(len(b2), n2, t)
 
-	existsWithContent(logFile(dir), b2, t)
+	existsWithContent(csvFile(dir), b2, t)
 	existsWithContent(backupFileLocal(dir), b, t)
 }
 
@@ -538,7 +578,7 @@ func TestRotate(t *testing.T) {
 	dir := makeTempDir("TestRotate", t)
 	defer os.RemoveAll(dir)
 
-	filename := logFile(dir)
+	filename := csvFile(dir)
 
 	l := &Csv{
 		Filename:   filename,
@@ -597,7 +637,7 @@ func TestCompressOnRotate(t *testing.T) {
 	dir := makeTempDir("TestCompressOnRotate", t)
 	defer os.RemoveAll(dir)
 
-	filename := logFile(dir)
+	filename := csvFile(dir)
 	l := &Csv{
 		Compress: true,
 		Filename: filename,
@@ -646,7 +686,7 @@ func TestCompressOnResume(t *testing.T) {
 	dir := makeTempDir("TestCompressOnResume", t)
 	defer os.RemoveAll(dir)
 
-	filename := logFile(dir)
+	filename := csvFile(dir)
 	l := &Csv{
 		Compress: true,
 		Filename: filename,
@@ -772,18 +812,18 @@ func existsWithContent(path string, content []byte, t testing.TB) {
 	equalsUp(content, b, t, 1)
 }
 
-// logFile returns the log file name in the given directory for the current fake
+// csvFile returns the log file name in the given directory for the current fake
 // time.
-func logFile(dir string) string {
-	return filepath.Join(dir, "foobar.log")
+func csvFile(dir string) string {
+	return filepath.Join(dir, "foobar.csv")
 }
 
 func backupFile(dir string) string {
-	return filepath.Join(dir, "foobar-"+fakeTime().UTC().Format(backupTimeFormat)+".log")
+	return filepath.Join(dir, "foobar-"+fakeTime().UTC().Format(backupTimeFormat)+".csv")
 }
 
 func backupFileLocal(dir string) string {
-	return filepath.Join(dir, "foobar-"+fakeTime().Format(backupTimeFormat)+".log")
+	return filepath.Join(dir, "foobar-"+fakeTime().Format(backupTimeFormat)+".csv")
 }
 
 // csvFileLocal returns the log file name in the given directory for the current
