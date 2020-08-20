@@ -173,12 +173,15 @@ func (c *Csv) Save(p []string) (err error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	writeLen := int64(1)
-	//if writeLen > c.max() {
-	//	return fmt.Errorf(
-	//		"write length %d exceeds maximum file size %d", writeLen, c.max(),
-	//	)
-	//}
+	writeLen := int64(0)
+	for _, v := range p {
+		writeLen += int64(len(v))
+	}
+	if writeLen > c.max() {
+		return fmt.Errorf(
+			"write length %d exceeds maximum file size %d", writeLen, c.max(),
+		)
+	}
 
 	if c.file == nil {
 		if err = c.openExistingOrNew(len(p)); err != nil {
@@ -198,7 +201,7 @@ func (c *Csv) Save(p []string) (err error) {
 	}
 
 	c.size += writeLen
-
+	c.csv.Flush()
 	return nil
 }
 
@@ -210,12 +213,17 @@ func (c *Csv) Saves(p [][]string) (err error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	writeLen := int64(len(p))
-	//if writeLen > c.max() {
-	//	return fmt.Errorf(
-	//		"write length %d exceeds maximum file size %d", writeLen, c.max(),
-	//	)
-	//}
+	writeLen := int64(0)
+	for _, v := range p {
+		for _, vv := range v {
+			writeLen += int64(len(vv))
+		}
+	}
+	if writeLen > c.max() {
+		return fmt.Errorf(
+			"write length %d exceeds maximum file size %d", writeLen, c.max(),
+		)
+	}
 
 	if c.file == nil {
 		if err = c.openExistingOrNew(len(p)); err != nil {
@@ -234,10 +242,9 @@ func (c *Csv) Saves(p [][]string) (err error) {
 		if err != nil {
 			return err
 		}
-
-		c.size += writeLen
-
 	}
+	c.size += writeLen
+	c.csv.Flush()
 
 	return nil
 }
