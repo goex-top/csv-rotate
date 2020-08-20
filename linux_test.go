@@ -14,7 +14,7 @@ func TestMaintainMode(t *testing.T) {
 	dir := makeTempDir("TestMaintainMode", t)
 	defer os.RemoveAll(dir)
 
-	filename := logFile(dir)
+	filename := csvFile(dir)
 
 	mode := os.FileMode(0600)
 	f, err := os.OpenFile(filename, os.O_CREATE|os.O_RDWR, mode)
@@ -58,7 +58,7 @@ func TestMaintainOwner(t *testing.T) {
 	dir := makeTempDir("TestMaintainOwner", t)
 	defer os.RemoveAll(dir)
 
-	filename := logFile(dir)
+	filename := csvFile(dir)
 
 	f, err := os.OpenFile(filename, os.O_CREATE|os.O_RDWR, 0644)
 	isNil(err, t)
@@ -90,7 +90,7 @@ func TestCompressMaintainMode(t *testing.T) {
 	dir := makeTempDir("TestCompressMaintainMode", t)
 	defer os.RemoveAll(dir)
 
-	filename := logFile(dir)
+	filename := csvFile(dir)
 
 	mode := os.FileMode(0600)
 	f, err := os.OpenFile(filename, os.O_CREATE|os.O_RDWR, mode)
@@ -141,7 +141,7 @@ func TestCompressMaintainOwner(t *testing.T) {
 	dir := makeTempDir("TestCompressMaintainOwner", t)
 	defer os.RemoveAll(dir)
 
-	filename := logFile(dir)
+	filename := csvFile(dir)
 
 	f, err := os.OpenFile(filename, os.O_CREATE|os.O_RDWR, 0644)
 	isNil(err, t)

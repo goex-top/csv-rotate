@@ -43,7 +43,7 @@ const (
 )
 
 // ensure we always implement io.WriteCloser
-var _ io.WriteCloser = (*Logger)(nil)
+var _ io.WriteCloser = (*Csv)(nil)
 
 // Logger is an io.WriteCloser that writes to the specified filename.
 //
@@ -64,8 +64,8 @@ var _ io.WriteCloser = (*Logger)(nil)
 // timestamp is the time at which the log was rotated formatted with the
 // time.Time format of `2006-01-02T15-04-05.000` and the extension is the
 // original extension.  For example, if your Logger.Filename is
-// `/var/log/foo/server.log`, a backup created at 6:30pm on Nov 11 2016 would
-// use the filename `/var/log/foo/server-2016-11-04T18-30-00.000.log`
+// `/var/log/foo/server.csv`, a backup created at 6:30pm on Nov 11 2016 would
+// use the filename `/var/log/foo/server-2016-11-04T18-30-00.000.csv`
 //
 // Cleaning Up Old Log Files
 //
@@ -79,7 +79,7 @@ var _ io.WriteCloser = (*Logger)(nil)
 // If MaxBackups and MaxAge are both 0, no old log files will be deleted.
 type Csv struct {
 	// Filename is the file to write logs to.  Backup log files will be retained
-	// in the same directory.  It uses <processname>-lumberjack.log in
+	// in the same directory.  It uses <processname>-lumberjack.csv in
 	// os.TempDir() if empty.
 	Filename string `json:"filename" yaml:"filename"`
 
@@ -173,12 +173,12 @@ func (c *Csv) Save(p []string) (err error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	writeLen := int64(len(p))
-	if writeLen > c.max() {
-		return fmt.Errorf(
-			"write length %d exceeds maximum file size %d", writeLen, c.max(),
-		)
-	}
+	writeLen := int64(1)
+	//if writeLen > c.max() {
+	//	return fmt.Errorf(
+	//		"write length %d exceeds maximum file size %d", writeLen, c.max(),
+	//	)
+	//}
 
 	if c.file == nil {
 		if err = c.openExistingOrNew(len(p)); err != nil {
@@ -197,8 +197,46 @@ func (c *Csv) Save(p []string) (err error) {
 		return err
 	}
 
+	c.size += writeLen
+
+	return nil
+}
+
+// Write implements io.Writer.  If a write would cause the log file to be larger
+// than MaxSize, the file is closed, renamed to include a timestamp of the
+// current time, and a new log file is created using the original log file name.
+// If the length of the write is greater than MaxSize, an error is returned.
+func (c *Csv) Saves(p [][]string) (err error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	writeLen := int64(len(p))
+	//if writeLen > c.max() {
+	//	return fmt.Errorf(
+	//		"write length %d exceeds maximum file size %d", writeLen, c.max(),
+	//	)
+	//}
+
+	if c.file == nil {
+		if err = c.openExistingOrNew(len(p)); err != nil {
+			return err
+		}
+	}
+
+	if c.size+writeLen > c.max() {
+		if err := c.rotate(); err != nil {
+			return err
+		}
+	}
+
 	for _, v := range p {
-		c.size += int64(len(v))
+		err = c.csv.Write(v)
+		if err != nil {
+			return err
+		}
+
+		c.size += writeLen
+
 	}
 
 	return nil
@@ -213,10 +251,12 @@ func (c *Csv) Close() error {
 
 // close closes the file if it is open.
 func (c *Csv) close() error {
+	if c.csv != nil {
+		c.csv.Flush()
+	}
 	if c.file == nil {
 		return nil
 	}
-	c.csv.Flush()
 	err := c.file.Close()
 	c.file = nil
 	return err
@@ -347,7 +387,7 @@ func (c *Csv) filename() string {
 	if c.Filename != "" {
 		return c.Filename
 	}
-	name := filepath.Base(os.Args[0]) + "-lumberjack.log"
+	name := filepath.Base(os.Args[0]) + "-csv-rotate.csv"
 	return filepath.Join(os.TempDir(), name)
 }
 
