@@ -76,26 +76,26 @@ var _ io.WriteCloser = (*Csv)(nil)
 // MaxBackups.  Note that the time encoded in the timestamp is the rotation
 // time, which may differ from the last time that file was written to.
 //
-// If MaxBackups and MaxAge are both 0, no old log files will be deleted.
+// If MaxBackups and MaxAge are both 0, no old csv files will be deleted.
 type Csv struct {
-	// Filename is the file to write logs to.  Backup log files will be retained
+	// Filename is the file to write csvs to.  Backup csv files will be retained
 	// in the same directory.  It uses <processname>-lumberjack.csv in
 	// os.TempDir() if empty.
 	Filename string `json:"filename" yaml:"filename"`
 
-	// MaxSize is the maximum size in megabytes of the log file before it gets
+	// MaxSize is the maximum size in megabytes of the csv file before it gets
 	// rotated. It defaults to 100 megabytes.
 	MaxSize int `json:"maxsize" yaml:"maxsize"`
 
-	// MaxAge is the maximum number of days to retain old log files based on the
+	// MaxAge is the maximum number of days to retain old csv files based on the
 	// timestamp encoded in their filename.  Note that a day is defined as 24
 	// hours and may not exactly correspond to calendar days due to daylight
-	// savings, leap seconds, etc. The default is not to remove old log files
+	// savings, leap seconds, etc. The default is not to remove old csv files
 	// based on age.
 	MaxAge int `json:"maxage" yaml:"maxage"`
 
-	// MaxBackups is the maximum number of old log files to retain.  The default
-	// is to retain all old log files (though MaxAge may still cause them to get
+	// MaxBackups is the maximum number of old csv files to retain.  The default
+	// is to retain all old csv files (though MaxAge may still cause them to get
 	// deleted.)
 	MaxBackups int `json:"maxbackups" yaml:"maxbackups"`
 
@@ -104,7 +104,7 @@ type Csv struct {
 	// time.
 	LocalTime bool `json:"localtime" yaml:"localtime"`
 
-	// Compress determines if the rotated log files should be compressed
+	// Compress determines if the rotated csv files should be compressed
 	// using gzip. The default is not to perform compression.
 	Compress bool `json:"compress" yaml:"compress"`
 
@@ -132,9 +132,9 @@ var (
 	megabyte = 1024 * 1024
 )
 
-// Write implements io.Writer.  If a write would cause the log file to be larger
+// Write implements io.Writer.  If a write would cause the csv file to be larger
 // than MaxSize, the file is closed, renamed to include a timestamp of the
-// current time, and a new log file is created using the original log file name.
+// current time, and a new csv file is created using the original csv file name.
 // If the length of the write is greater than MaxSize, an error is returned.
 func (c *Csv) Write(p []byte) (n int, err error) {
 	c.mu.Lock()
@@ -165,9 +165,9 @@ func (c *Csv) Write(p []byte) (n int, err error) {
 	return n, err
 }
 
-// Write implements io.Writer.  If a write would cause the log file to be larger
+// Write implements io.Writer.  If a write would cause the csv file to be larger
 // than MaxSize, the file is closed, renamed to include a timestamp of the
-// current time, and a new log file is created using the original log file name.
+// current time, and a new csv file is created using the original csv file name.
 // If the length of the write is greater than MaxSize, an error is returned.
 func (c *Csv) Save(p []string) (err error) {
 	c.mu.Lock()
@@ -205,9 +205,9 @@ func (c *Csv) Save(p []string) (err error) {
 	return nil
 }
 
-// Write implements io.Writer.  If a write would cause the log file to be larger
+// Write implements io.Writer.  If a write would cause the csv file to be larger
 // than MaxSize, the file is closed, renamed to include a timestamp of the
-// current time, and a new log file is created using the original log file name.
+// current time, and a new csv file is created using the original csv file name.
 // If the length of the write is greater than MaxSize, an error is returned.
 func (c *Csv) Saves(p [][]string) (err error) {
 	c.mu.Lock()
@@ -249,7 +249,7 @@ func (c *Csv) Saves(p [][]string) (err error) {
 	return nil
 }
 
-// Close implements io.Closer, and closes the current logfile.
+// Close implements io.Closer, and closes the current csvfile.
 func (c *Csv) Close() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -269,10 +269,10 @@ func (c *Csv) close() error {
 	return err
 }
 
-// Rotate causes Logger to close the existing log file and immediately create a
+// Rotate causes Logger to close the existing csv file and immediately create a
 // new one.  This is a helper function for applications that want to initiate
 // rotations outside of the normal rotation rules, such as in response to
-// SIGHUP.  After rotating, this initiates compression and removal of old log
+// SIGHUP.  After rotating, this initiates compression and removal of old csv
 // files according to the configuration.
 func (c *Csv) Rotate() error {
 	c.mu.Lock()
@@ -294,24 +294,24 @@ func (c *Csv) rotate() error {
 	return nil
 }
 
-// openNew opens a new log file for writing, moving any old log file out of the
+// openNew opens a new csv file for writing, moving any old csv file out of the
 // way.  This methods assumes the file has already been closed.
 func (c *Csv) openNew() error {
 	err := os.MkdirAll(c.dir(), 0755)
 	if err != nil {
-		return fmt.Errorf("can't make directories for new logfile: %s", err)
+		return fmt.Errorf("can't make directories for new csvfile: %s", err)
 	}
 
 	name := c.filename()
 	mode := os.FileMode(0600)
 	info, err := os_Stat(name)
 	if err == nil {
-		// Copy the mode off the old logfile.
+		// Copy the mode off the old csvfile.
 		mode = info.Mode()
 		// move the existing file
 		newname := backupName(name, c.LocalTime)
 		if err := os.Rename(name, newname); err != nil {
-			return fmt.Errorf("can't rename log file: %s", err)
+			return fmt.Errorf("can't rename csv file: %s", err)
 		}
 
 		// this is a no-op anywhere but linux
@@ -325,7 +325,7 @@ func (c *Csv) openNew() error {
 	// just wipe out the contents.
 	f, err := os.OpenFile(name, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, mode)
 	if err != nil {
-		return fmt.Errorf("can't open new logfile: %s", err)
+		return fmt.Errorf("can't open new csvfile: %s", err)
 	}
 
 	c.file = f
@@ -359,7 +359,7 @@ func backupName(name string, local bool) string {
 	return filepath.Join(dir, fmt.Sprintf("%s-%s%s", prefix, timestamp, ext))
 }
 
-// openExistingOrNew opens the logfile if it exists and if the current write
+// openExistingOrNew opens the csvfile if it exists and if the current write
 // would not put it over MaxSize.  If there is no such file or the write would
 // put it over the MaxSize, a new file is created.
 func (c *Csv) openExistingOrNew(writeLen int) error {
@@ -371,7 +371,7 @@ func (c *Csv) openExistingOrNew(writeLen int) error {
 		return c.openNew()
 	}
 	if err != nil {
-		return fmt.Errorf("error getting log file info: %s", err)
+		return fmt.Errorf("error getting csv file info: %s", err)
 	}
 
 	if info.Size()+int64(writeLen) >= c.max() {
@@ -380,8 +380,8 @@ func (c *Csv) openExistingOrNew(writeLen int) error {
 
 	file, err := os.OpenFile(filename, os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
-		// if we fail to open the old log file for some reason, just ignore
-		// it and open a new log file.
+		// if we fail to open the old csv file for some reason, just ignore
+		// it and open a new csv file.
 		return c.openNew()
 	}
 	c.file = file
@@ -390,7 +390,7 @@ func (c *Csv) openExistingOrNew(writeLen int) error {
 	return nil
 }
 
-// filename generates the name of the logfile from the current time.
+// filename generates the name of the csvfile from the current time.
 func (c *Csv) filename() string {
 	if c.Filename != "" {
 		return c.Filename
@@ -399,8 +399,8 @@ func (c *Csv) filename() string {
 	return filepath.Join(os.TempDir(), name)
 }
 
-// millRunOnce performs compression and removal of stale log files.
-// Log files are compressed if enabled via configuration and old log
+// millRunOnce performs compression and removal of stale csv files.
+// Log files are compressed if enabled via configuration and old csv
 // files are removed, keeping at most c.MaxBackups files, as long as
 // none of them are older than MaxAge.
 func (c *Csv) millRunOnce() error {
@@ -413,14 +413,14 @@ func (c *Csv) millRunOnce() error {
 		return err
 	}
 
-	var compress, remove []logInfo
+	var compress, remove []csvInfo
 
 	if c.MaxBackups > 0 && c.MaxBackups < len(files) {
 		preserved := make(map[string]bool)
-		var remaining []logInfo
+		var remaining []csvInfo
 		for _, f := range files {
-			// Only count the uncompressed log file or the
-			// compressed log file, not both.
+			// Only count the uncompressed csv file or the
+			// compressed csv file, not both.
 			fn := f.Name()
 			if strings.HasSuffix(fn, compressSuffix) {
 				fn = fn[:len(fn)-len(compressSuffix)]
@@ -439,7 +439,7 @@ func (c *Csv) millRunOnce() error {
 		diff := time.Duration(int64(24*time.Hour) * int64(c.MaxAge))
 		cutoff := currentTime().Add(-1 * diff)
 
-		var remaining []logInfo
+		var remaining []csvInfo
 		for _, f := range files {
 			if f.timestamp.Before(cutoff) {
 				remove = append(remove, f)
@@ -476,15 +476,15 @@ func (c *Csv) millRunOnce() error {
 }
 
 // millRun runs in a goroutine to manage post-rotation compression and removal
-// of old log files.
+// of old csv files.
 func (c *Csv) millRun() {
 	for _ = range c.millCh {
-		// what am I going to do, log this?
+		// what am I going to do, csv this?
 		_ = c.millRunOnce()
 	}
 }
 
-// mill performs post-rotation compression and removal of stale log files,
+// mill performs post-rotation compression and removal of stale csv files,
 // starting the mill goroutine if necessary.
 func (c *Csv) mill() {
 	c.startMill.Do(func() {
@@ -497,14 +497,14 @@ func (c *Csv) mill() {
 	}
 }
 
-// oldLogFiles returns the list of backup log files stored in the same
-// directory as the current log file, sorted by ModTime
-func (c *Csv) oldLogFiles() ([]logInfo, error) {
+// oldLogFiles returns the list of backup csv files stored in the same
+// directory as the current csv file, sorted by ModTime
+func (c *Csv) oldLogFiles() ([]csvInfo, error) {
 	files, err := ioutil.ReadDir(c.dir())
 	if err != nil {
-		return nil, fmt.Errorf("can't read log file directory: %s", err)
+		return nil, fmt.Errorf("can't read csv file directory: %s", err)
 	}
-	logFiles := []logInfo{}
+	csvFiles := []csvInfo{}
 
 	prefix, ext := c.prefixAndExt()
 
@@ -513,20 +513,20 @@ func (c *Csv) oldLogFiles() ([]logInfo, error) {
 			continue
 		}
 		if t, err := c.timeFromName(f.Name(), prefix, ext); err == nil {
-			logFiles = append(logFiles, logInfo{t, f})
+			csvFiles = append(csvFiles, csvInfo{t, f})
 			continue
 		}
 		if t, err := c.timeFromName(f.Name(), prefix, ext+compressSuffix); err == nil {
-			logFiles = append(logFiles, logInfo{t, f})
+			csvFiles = append(csvFiles, csvInfo{t, f})
 			continue
 		}
 		// error parsing means that the suffix at the end was not generated
 		// by lumberjack, and therefore it's not a backup file.
 	}
 
-	sort.Sort(byFormatTime(logFiles))
+	sort.Sort(byFormatTime(csvFiles))
 
-	return logFiles, nil
+	return csvFiles, nil
 }
 
 // timeFromName extracts the formatted time from the filename by stripping off
@@ -543,7 +543,7 @@ func (c *Csv) timeFromName(filename, prefix, ext string) (time.Time, error) {
 	return time.Parse(backupTimeFormat, ts)
 }
 
-// max returns the maximum size in bytes of log files before rolling.
+// max returns the maximum size in bytes of csv files before rolling.
 func (c *Csv) max() int64 {
 	if c.MaxSize == 0 {
 		return int64(defaultMaxSize * megabyte)
@@ -565,29 +565,29 @@ func (c *Csv) prefixAndExt() (prefix, ext string) {
 	return prefix, ext
 }
 
-// compressLogFile compresses the given log file, removing the
-// uncompressed log file if successful.
+// compressLogFile compresses the given csv file, removing the
+// uncompressed csv file if successful.
 func compressLogFile(src, dst string) (err error) {
 	f, err := os.Open(src)
 	if err != nil {
-		return fmt.Errorf("failed to open log file: %v", err)
+		return fmt.Errorf("failed to open csv file: %v", err)
 	}
 	defer f.Close()
 
 	fi, err := os_Stat(src)
 	if err != nil {
-		return fmt.Errorf("failed to stat log file: %v", err)
+		return fmt.Errorf("failed to stat csv file: %v", err)
 	}
 
 	if err := chown(dst, fi); err != nil {
-		return fmt.Errorf("failed to chown compressed log file: %v", err)
+		return fmt.Errorf("failed to chown compressed csv file: %v", err)
 	}
 
 	// If this file already exists, we presume it was created by
-	// a previous attempt to compress the log file.
+	// a previous attempt to compress the csv file.
 	gzf, err := os.OpenFile(dst, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, fi.Mode())
 	if err != nil {
-		return fmt.Errorf("failed to open compressed log file: %v", err)
+		return fmt.Errorf("failed to open compressed csv file: %v", err)
 	}
 	defer gzf.Close()
 
@@ -596,7 +596,7 @@ func compressLogFile(src, dst string) (err error) {
 	defer func() {
 		if err != nil {
 			os.Remove(dst)
-			err = fmt.Errorf("failed to compress log file: %v", err)
+			err = fmt.Errorf("failed to compress csv file: %v", err)
 		}
 	}()
 
@@ -620,15 +620,15 @@ func compressLogFile(src, dst string) (err error) {
 	return nil
 }
 
-// logInfo is a convenience struct to return the filename and its embedded
+// csvInfo is a convenience struct to return the filename and its embedded
 // timestamp.
-type logInfo struct {
+type csvInfo struct {
 	timestamp time.Time
 	os.FileInfo
 }
 
 // byFormatTime sorts by newest time formatted in the name.
-type byFormatTime []logInfo
+type byFormatTime []csvInfo
 
 func (b byFormatTime) Less(i, j int) bool {
 	return b[i].timestamp.After(b[j].timestamp)
